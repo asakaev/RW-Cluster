@@ -1,0 +1,19 @@
+{
+  "redis": {
+    "host": "127.0.0.1",
+    "port": 6379
+  },
+  "deadLettersReader": {
+    "batchReadSize": 10
+  },
+  "readerNode": {
+    "noMessageDelayMs": 2000
+  },
+  "writerNode": {
+    "sleepMs": 1000
+  },
+  "topics": {
+    "messages": "messages",
+    "deadLetters": "dead-letters"
+  }
+}
