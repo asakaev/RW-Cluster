@@ -2,13 +2,6 @@ var Promise = require('bluebird').Promise
 var RedisClient = require('redis').RedisClient
 var log4js = require('log4js')
 
-var log = log4js.getLogger('App')
-var config = require('./etc/config.json')
-
-var deadLettersBatchSize = config.deadLettersReader.batchReadSize
-var readerNoMessagesDelayMs = config.readerNode.noMessageDelayMs
-var writerSleepMs = config.writerNode.sleepMs
-
 var DeadLettersReader = require('./src/roles/dead-letters-reader')
 var RuntimeReconfigurator = require('./src/roles/runtime-reconfigurator')
 var WriterNode = require('./src/roles/writer-node')
@@ -19,6 +12,13 @@ var Consumer = require('./src/mq/consumer')
 var Lease = require('./src/mutex/lease')
 var WriterNodeHealthcheck = require('./src/coordination/writer-node-healthcheck')
 var WriterNodeLeaseUpdater = require('./src/coordination/writer-node-lease-updater')
+
+var log = log4js.getLogger('App')
+var config = require('./etc/config.json')
+
+var deadLettersBatchSize = config.deadLettersReader.batchReadSize
+var readerNoMessagesDelayMs = config.readerNode.noMessageDelayMs
+var writerSleepMs = config.writerNode.sleepMs
 
 
 var redisOptions = {
@@ -51,8 +51,6 @@ var reader = new ReaderNode(consumer, producer, messagesTopic, deadLettersTopic)
 var writerNodeHealthcheck = new WriterNodeHealthcheck(lease)
 var writerNodeLeaseUpdater = new WriterNodeLeaseUpdater(lease, writer.getId())
 
-
-// todo: logger with name
 
 function becomeReaderNode() {
   writerNodeHealthcheck.run()
