@@ -1,5 +1,7 @@
 # RW-Cluster
 
+![rw-cluster.png](https://bitbucket.org/repo/64KGjqx/images/1449010692-rw-cluster.png)
+
 * Leader-Election: mutex (redis transactions)
 * Messaging: queue (redis list)
 
