@@ -20,12 +20,12 @@ var deadLettersBatchSize = config.deadLettersReader.batchReadSize
 var readerNoMessagesDelayMs = config.readerNode.noMessageDelayMs
 var writerSleepMs = config.writerNode.sleepMs
 
-
 var redisOptions = {
   host: config.redis.host,
   port: config.redis.port,
   enable_offline_queue: false
 }
+
 
 var redisClient = new RedisClient(redisOptions)
   .on('error', function(e) { log.error(e.message) })
@@ -52,36 +52,23 @@ var writerNodeHealthcheck = new WriterNodeHealthcheck(lease)
 var writerNodeLeaseUpdater = new WriterNodeLeaseUpdater(lease, writer.getId())
 
 
-function becomeReaderNode() {
-  writerNodeHealthcheck.run()
+function becomeDeadLettersReader() {
+  log.debug('read dead letters, batch size:', deadLettersBatchSize)
 
-  reader.readMessage()
-    .then(function(maybeMessage) {
-      if (!maybeMessage) {
-        return Promise.delay(readerNoMessagesDelayMs)
-      } else {
-        log.info('read message:', maybeMessage)
-        return reader.processMessage(maybeMessage)
-          .catch(function() {
-            log.warn('message-not-processed', maybeMessage)
-            return reader.writeDeadLetter(maybeMessage)
-              .then(function() { log.debug('Write message to dead letter queue') })
-          })
-      }
-    })
-    .then(function() {
-      if (writerNodeHealthcheck.isWriterNodeOnline()) {
-        becomeReaderNode()
-      } else {
-        writerNodeHealthcheck.shutdown()
-        becomeRuntimeReconfigurator()
-      }
-    })
-    .catch(function(e) {
-      writerNodeHealthcheck.shutdown()
-      log.error('Failed to be a reader node:', e.message)
-      becomeIdle()
-    })
+  function loop() {
+    deadLettersReader.readBatch(deadLettersBatchSize)
+      .then(function(messages) {
+        if (messages.length) {
+          console.log(messages)
+          loop()
+        } else {
+          console.log('Done')
+          closeApp()
+        }
+      })
+  }
+
+  loop()
 }
 
 
@@ -131,6 +118,39 @@ function becomeWriterNode() {
 }
 
 
+function becomeReaderNode() {
+  writerNodeHealthcheck.run()
+
+  reader.readMessage()
+    .then(function(maybeMessage) {
+      if (!maybeMessage) {
+        return Promise.delay(readerNoMessagesDelayMs)
+      } else {
+        log.info('read message:', maybeMessage)
+        return reader.processMessage(maybeMessage)
+          .catch(function() {
+            log.warn('message-not-processed', maybeMessage)
+            return reader.writeDeadLetter(maybeMessage)
+              .then(function() { log.debug('Write message to dead letter queue') })
+          })
+      }
+    })
+    .then(function() {
+      if (writerNodeHealthcheck.isWriterNodeOnline()) {
+        becomeReaderNode()
+      } else {
+        writerNodeHealthcheck.shutdown()
+        becomeRuntimeReconfigurator()
+      }
+    })
+    .catch(function(e) {
+      writerNodeHealthcheck.shutdown()
+      log.error('Failed to be a reader node:', e.message)
+      becomeIdle()
+    })
+}
+
+
 function becomeIdle() {
   var idleTimeMs = 3000
   log.info('idle', idleTimeMs)
@@ -138,34 +158,8 @@ function becomeIdle() {
 }
 
 
-function becomeDeadLettersReader() {
-  log.debug('read dead letters, batch size:', deadLettersBatchSize)
-
-  function loop() {
-    deadLettersReader.readBatch(deadLettersBatchSize)
-      .then(function(messages) {
-        if (messages.length) {
-          console.log(messages)
-          loop()
-        } else {
-          console.log('Done')
-          closeApp()
-        }
-      })
-  }
-
-  loop()
-}
-
-
-function closeApp() {
-  redisClient.quit()
-}
-
-function deadLettersMode() {
-  return process.argv[2] === 'getErrors'
-}
-
+function closeApp() { redisClient.quit() }
+function deadLettersMode() { return process.argv[2] === 'getErrors' }
 
 redisClient.once('ready', function() {
   deadLettersMode() ? becomeDeadLettersReader() : becomeRuntimeReconfigurator()
