@@ -36,8 +36,8 @@ var deadLettersTopic = config.topics.deadLetters
 
 // queue
 var serializer = new Serializer()
-var consumer = new Consumer(redisClient, serializer)
 var producer = new Producer(redisClient, serializer)
+var consumer = new Consumer(redisClient, serializer)
 
 var lease = new Lease(redisClient, 'lease-key')
 
